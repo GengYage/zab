@@ -16,12 +16,10 @@ public class Data {
 
     @Override
     public String toString() {
-        StringBuilder sb = new StringBuilder();
-        sb.append("Data: {");
-        sb.append(" zxId=").append(zxId);
-        sb.append(" kv=[").append(kv.getObject1()).append(":").append(kv.getObject2());
-        sb.append("}");
-        return sb.toString();
+        return "Data: {" +
+                " zxId=" + zxId +
+                " kv=[" + kv.getObject1() + ":" + kv.getObject2() +
+                "}";
     }
 
     public ZxId getZxId() {

@@ -155,7 +155,7 @@ public class DataManager {
         }finally {
             committedLock.readLock().unlock();
         }
-        return -1l;
+        return -1L;
     }
 
     private void updateLastIndex(final Long index) {

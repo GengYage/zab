@@ -22,12 +22,10 @@ public class VoteMessage extends AbstractMessage<VoteMessage> {
 
     @Override
     public String toString() {
-        StringBuilder sb = new StringBuilder();
-        sb.append("VoteMessage: [");
-        sb.append(" vote=").append(vote);
-        sb.append(" success=").append(success);
-        sb.append("]");
-        return sb.toString();
+        return "VoteMessage: [" +
+                " vote=" + vote +
+                " success=" + success +
+                "]";
     }
 
     public Vote getVote() {

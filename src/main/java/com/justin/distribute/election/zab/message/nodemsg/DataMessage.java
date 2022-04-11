@@ -29,14 +29,12 @@ public class DataMessage extends AbstractMessage<DataMessage> {
 
     @Override
     public String toString() {
-        StringBuilder sb = new StringBuilder();
-        sb.append(" DataMessage: [");
-        sb.append(" nodeId=" + nodeId);
-        sb.append(" data=" + data);
-        sb.append(" type=" + type);
-        sb.append(" success=" + success);
-        sb.append("]");
-        return sb.toString();
+        return " DataMessage: [" +
+                " nodeId=" + nodeId +
+                " data=" + data +
+                " type=" + type +
+                " success=" + success +
+                "]";
     }
 
     public int getNodeId() {

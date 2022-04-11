@@ -250,11 +250,7 @@ public class Node {
                 voteCounter += 1;
             }
         }
-        if (voteCounter > nodeConfig.getNodeMap().size()/2) {
-            return true;
-        }else {
-            return false;
-        }
+        return voteCounter > nodeConfig.getNodeMap().size() / 2;
     }
 
     public void becomeLeader() {

@@ -25,14 +25,12 @@ public class JoinGroupMessage extends AbstractMessage<JoinGroupMessage> {
 
     @Override
     public String toString() {
-        StringBuilder sb = new StringBuilder();
-        sb.append("JoinGroupMessage: [");
-        sb.append(" nodeId=" + nodeId);
-        sb.append(" host=" + host);
-        sb.append(" port=" + port);
-        sb.append(" nodeMgrPort=" + nodeMgrPort);
-        sb.append("]");
-        return sb.toString();
+        return "JoinGroupMessage: [" +
+                " nodeId=" + nodeId +
+                " host=" + host +
+                " port=" + port +
+                " nodeMgrPort=" + nodeMgrPort +
+                "]";
     }
 
     public int getNodeId() {
