@@ -3,13 +3,11 @@ package com.justin.distribute.election.zab;
 import com.justin.distribute.election.zab.data.ZxId;
 
 
-public class Vote implements Comparable<Vote>{
+public class Vote implements Comparable<Vote> {
     private int nodeId;
     private volatile long epoch;
     private volatile int voteId;
     private volatile ZxId lastZxId;
-
-    public Vote() {}
 
     public Vote(final int nodeId, final int voteId, final long epoch, final ZxId lastZxId) {
         this.nodeId = nodeId;
@@ -22,13 +20,19 @@ public class Vote implements Comparable<Vote>{
         this.setEpoch(++epoch);
     }
 
+    /**
+     * 判断投票信息的有效性
+     * 如果 两个zxid相同则比较 sid（nodeId）
+     * 否则返回 zxid的比较结果
+     * 若zxid 和 sid （nodeId）都想同，则返回0
+     */
     @Override
     public int compareTo(Vote o) {
         if (this.lastZxId.compareTo(o.lastZxId) != 0) {
             return this.lastZxId.compareTo(o.lastZxId);
-        }else if (this.nodeId < o.nodeId) {
+        } else if (this.nodeId < o.nodeId) {
             return -1;
-        }else if (this.nodeId > o.nodeId) {
+        } else if (this.nodeId > o.nodeId) {
             return 1;
         }
         return 0;
@@ -36,14 +40,12 @@ public class Vote implements Comparable<Vote>{
 
     @Override
     public String toString() {
-        StringBuilder sb = new StringBuilder();
-        sb.append("Vote: [");
-        sb.append(" nodeId=" + nodeId);
-        sb.append(" voteId=" + voteId);
-        sb.append(" epoch=" + epoch);
-        sb.append(" lastZxId=" + lastZxId);
-        sb.append("]");
-        return sb.toString();
+        return "Vote: [" +
+                " nodeId=" + nodeId +
+                " voteId=" + voteId +
+                " epoch=" + epoch +
+                " lastZxId=" + lastZxId +
+                "]";
     }
 
     public int getNodeId() {

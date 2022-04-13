@@ -71,27 +71,27 @@ public class Node {
             if (running) {
                 return;
             }
-
+            // 初始化集群间通信的消息服务器
             nodeMgrServer = new NettyRemotingServer(new NettyServerConfig(nodeConfig.getHost(), nodeConfig.getNodeMgrPort()));
             nodeMgrServer.registerProcessor(MessageType.JOIN_GROUP, new JoinGroupProcessor(this), executorService);
             nodeMgrServer.start();
-
+            // 初始化节点对外提供服务的消息监听器，初始化投票消息，数据同步消息，客户端消息的处理器
             nodeServer = new NettyRemotingServer(new NettyServerConfig(nodeConfig.getHost(), nodeConfig.getPort()));
             nodeServer.registerProcessor(MessageType.VOTE, new VoteRequestProcessor(this), executorService);
             nodeServer.registerProcessor(MessageType.DATA_SYNC, new DataRequestProcessor(this), executorService);
             nodeServer.registerProcessor(MessageType.CLIENT, new ClientRequestProcessor(this), executorService);
             nodeServer.start();
-
+            // 启动监听服务器，监听来自其他节点的消息
             client = new NettyRemotingClient(new NettyClientConfig());
             client.start();
-
+            // 初始化，宣告加入集群的消息，延迟2s后仅执行一次(2s时间用处确保本节点已经初始化)
             scheduledExecutorService.schedule(this::init, 2000, TimeUnit.MILLISECONDS);
-
+            // 选举线程，延迟秒开始选举，时钟500ms(完成一次选举后延迟500ms进行下一次Leader选举)
             scheduledExecutorService.scheduleAtFixedRate(this::election, 4000, 500, TimeUnit.MILLISECONDS);
-
+            // 一次心跳完成后，延迟5s进行下一次心跳
             scheduledExecutorService.scheduleWithFixedDelay(this::heartbeat, 0, nodeConfig.getHeartbeatTimeout(), TimeUnit.MILLISECONDS);
         }
-
+        // 关机钩子
         Runtime.getRuntime().addShutdownHook(new Thread(this::shutdown));
     }
 
@@ -120,6 +120,7 @@ public class Node {
     }
 
     private void init() {
+        //初始化自己的节点信息，以便告知其他节点
         JoinGroupMessage joinGroupMsg = JoinGroupMessage.getInstance();
         joinGroupMsg.setNodeId(nodeConfig.getNodeId());
         joinGroupMsg.setHost(nodeConfig.getHost());
@@ -127,6 +128,7 @@ public class Node {
         joinGroupMsg.setNodeMgrPort(nodeConfig.getNodeMgrPort());
 
         for (Map.Entry<Integer, String> entry : nodeConfig.getNodeMgrMap().entrySet()) {
+            //跳过本节点，只给集群中其他节点发送消息
             if (entry.getKey() == nodeConfig.getNodeId()) {
                 continue;
             }
@@ -134,12 +136,14 @@ public class Node {
             executorService.submit(() -> {
                 try {
                     RemotingMessage response = client.invokeSync(entry.getValue(), joinGroupMsg.request(), 3*1000);
+                    //解析消息，json的反序列化
                     JoinGroupMessage res = JoinGroupMessage.getInstance().parseMessage(response);
                     if (res.getSuccess()) {
                         int peerNodeId = res.getNodeId();
                         String host = res.getHost();
                         int port = res.getPort();
                         int nodeMgrPort = res.getNodeMgrPort();
+                        // 拿到其他节点的信息，通信端口和客户端端口
                         nodeConfig.getNodeMap().putIfAbsent(peerNodeId, host+":"+port);
                         nodeConfig.getNodeMgrMap().putIfAbsent(peerNodeId, host+":"+nodeMgrPort);
                     }
@@ -151,62 +155,72 @@ public class Node {
     }
 
     private void election() {
+        // 如果本节点已经是处于LEADING状态，那么不进行选举
         if (status == NodeStatus.LEADING) {
             return;
         }
-
+        // 判断自己的选举计时器是否已经结束，若选举定时器那么就开始本轮投票
         if (!nodeConfig.resetElectionTick()) {
             return;
         }
-
+        // 开始选举的关键，首先修改自己的状态为LOOKING
         status = NodeStatus.LOOKING;
-        epoch += 1;
+        // 递增epoch，关键，区分不同epoch
+        synchronized (this) {
+            epoch += 1;
+        }
+        //清空原有消息缓存 关键！！确保已经丢弃的消息不再出现
         zxIdMap.clear();
-
+        // 投票给自己
         this.myVote = new Vote(nodeConfig.getNodeId(), nodeConfig.getNodeId(), 0, getLastZxId());
         this.myVote.setEpoch(epoch);
+        //本地投票箱
         this.voteBox.put(nodeConfig.getNodeId(), myVote);
-
+        // 投票消息
         VoteMessage voteMessage = VoteMessage.getInstance();
         voteMessage.setVote(myVote);
         sendOneWayMsg(voteMessage.request());
     }
 
     private void heartbeat() {
+        // 节点间通信必须有Leader发起
         if (status != NodeStatus.LEADING) {
             return;
         }
-
+        // 判断此次心跳消息与上次心跳消息的间隔，若小于5s则不进行此次心跳
         if (!nodeConfig.resetHeartbeatTick()) {
             return;
         }
-
         for (Map.Entry<Integer, String> entry : nodeConfig.getNodeMap().entrySet()) {
+            // 只会给follow发送心跳消息，从投票箱中判断该节点是否为自己的Follower，只有给自己投过票的节点才有可能是Follower
             if (!voteBox.containsKey(entry.getKey())) {
                 continue;
             }
-
+            // 跳过自己
             if (entry.getKey() == nodeConfig.getNodeId()) {
                 continue;
             }
-
             long index = -1;
+            //初始化消息id
             if (zxIdMap.containsKey(entry.getKey())) {
+                // 优先从缓存中存
                 index = zxIdMap.get(entry.getKey()).getCounter();
             }else {
+                // 从日志中获取
                 index = dataManager.getLastIndex();
             }
 
+            // 更新epoch
             Data data = dataManager.read(index);
             if (data.getZxId().getEpoch() == 0) {
                 data.getZxId().setEpoch(epoch);
             }
-
+            // 初始化消息内容
             DataMessage dataMsg = DataMessage.getInstance();
             dataMsg.setNodeId(nodeConfig.getNodeId());
             dataMsg.setType(DataMessage.Type.SYNC);
             dataMsg.setData(data);
-
+            // 发送消息处理消息
             executorService.submit(() -> {
                 try {
                     RemotingMessage response = client.invokeSync(entry.getValue(), dataMsg.request(), 3*1000);
@@ -225,10 +239,10 @@ public class Node {
 
     public void sendOneWayMsg(RemotingMessage msg) {
         for (Map.Entry<Integer, String> entry : nodeConfig.getNodeMap().entrySet()) {
+            // 跳过自己
             if (entry.getKey() == nodeConfig.getNodeId()) {
                 continue;
             }
-
             executorService.submit(() -> {
                 try {
                     client.invokeOneway(entry.getValue(), msg, 3*1000);
@@ -240,6 +254,7 @@ public class Node {
     }
 
     public boolean isHalf() {
+        // 此情况 主要是，不是所有节点都发起了投票
         if (voteBox.size() != nodeConfig.getNodeMap().size()) {
             return false;
         }
@@ -250,6 +265,7 @@ public class Node {
                 voteCounter += 1;
             }
         }
+
         return voteCounter > nodeConfig.getNodeMap().size() / 2;
     }
 
@@ -258,6 +274,7 @@ public class Node {
         this.status = NodeStatus.LEADING;
     }
 
+    // 从节点受到了写请求，转发给主节点
     public RemotingMessage redirect(RemotingMessage request) {
         RemotingMessage response = null;
         try {
@@ -268,8 +285,10 @@ public class Node {
         return response;
     }
 
+    // 保存数据
     public void appendData(final String key, final String value) {
         Data data = new Data();
+        // 此时消息处于发起状态
         data.setKv(new Pair<>(key, value));
 
         DataMessage dataMessage = DataMessage.getInstance();
@@ -277,11 +296,14 @@ public class Node {
         dataMessage.setData(data);
         dataMessage.setType(DataMessage.Type.SNAPSHOT);
 
+        // Leader向其他节点同步数据
         for (Map.Entry<Integer, String> entry : nodeConfig.getNodeMap().entrySet()) {
             if (entry.getKey() == nodeConfig.getNodeId()) {
                 continue;
             }
 
+            // 线程池，避免每同步给一个follower都会阻塞等待ACK确认
+            // 导致服务器吞吐量降低
             executorService.submit(() -> {
                 try {
                     RemotingMessage response = client.invokeSync(entry.getValue(), dataMessage.request(), 3*1000);
@@ -289,7 +311,7 @@ public class Node {
                     int peerId = resDataMsg.getNodeId();
                     boolean success = resDataMsg.getSuccess();
                     snapshotMap.put(peerId, success);
-
+                    // 判断数据是否被过半几点记录
                     int snapshotCounter = 0;
                     for (Boolean flag : snapshotMap.values()) {
                         if (flag) {
@@ -297,6 +319,7 @@ public class Node {
                         }
                     }
                     if (snapshotCounter > nodeConfig.getNodeMap().size()/2) {
+                        // 通过countDownLatch 来标志是否可以提交数据
                         countDownLatch.countDown();
                     }
                 } catch (Exception e) {
@@ -306,11 +329,14 @@ public class Node {
         }
     }
 
+    //提交数据
     public boolean commitData(final String key) throws InterruptedException {
         if (countDownLatch.await(6000, TimeUnit.MILLISECONDS)) {
+            // 清楚缓存，开始持久化
             snapshotMap.clear();
             long lastIndex = dataManager.getLastIndex();
             String value = dataManager.get(key);
+            // 消息计数器自增
             ZxId zxId = new ZxId(epoch, lastIndex+1);
             Pair<String, String> kv = new Pair<>(key, value);
             Data data = new Data(zxId, kv);
@@ -322,13 +348,14 @@ public class Node {
                 dataMessage.setData(data);
                 dataMessage.setType(DataMessage.Type.COMMIT);
 
+                // 向Follower发送commit指令
                 for (Map.Entry<Integer, String> entry : nodeConfig.getNodeMap().entrySet()) {
                     if (entry.getKey() == nodeConfig.getNodeId()) {
                         continue;
                     }
-
                     executorService.submit(() -> {
                         try {
+                            // 无须阻塞等待follower确认，因为commit之前就已经有多数派经行了确认
                             client.invokeOneway(entry.getValue(), dataMessage.request(), 3000);
                         } catch (Exception e) {
                             logger.error(e);
@@ -336,7 +363,6 @@ public class Node {
                     });
                 }
             }
-
             return flag;
         }else {
             return false;

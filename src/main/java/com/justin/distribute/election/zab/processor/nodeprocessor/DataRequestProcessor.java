@@ -24,11 +24,15 @@ public class DataRequestProcessor implements NettyRequestProcessor {
         this.node = node;
     }
 
+    /**
+     * 数据同步消息处理器
+     */
     @Override
     public RemotingMessage processRequest(ChannelHandlerContext ctx, RemotingMessage request) throws Exception {
         try {
             if (node.getDataLock().tryLock(3000, TimeUnit.MILLISECONDS)) {
                 DataMessage dataMsg = DataMessage.getInstance().parseMessage(request);
+                // 心跳消息
                 if (dataMsg.getType() == DataMessage.Type.SYNC) {
                     logger.info("Receive heartbeat message: " + dataMsg);
                     node.getNodeConfig().setPreElectionTime(System.currentTimeMillis());
@@ -44,10 +48,12 @@ public class DataRequestProcessor implements NettyRequestProcessor {
 
                     Data resData = new Data();
                     resData.setKv(new Pair<>("", ""));
-                    if (lastData.getZxId().compareTo(peerLastData.getZxId()) == 1) {
-                        node.getDataManager().removeFromIndex(peerLastData.getZxId().getCounter()+1);
+
+                    // 日志同步
+                    if (lastData.getZxId().compareTo(peerLastData.getZxId()) > 0) {
+                        node.getDataManager().removeFromIndex(peerLastData.getZxId().getCounter() + 1);
                         resData.setZxId(peerLastData.getZxId());
-                    } else if (lastData.getZxId().compareTo(peerLastData.getZxId()) == -1) {
+                    } else if (lastData.getZxId().compareTo(peerLastData.getZxId()) < 0) {
                         long lastCounter = lastData.getZxId().getCounter();
                         lastCounter += 1;
                         if (lastCounter == peerLastData.getZxId().getCounter()) {
@@ -61,12 +67,12 @@ public class DataRequestProcessor implements NettyRequestProcessor {
                     } else if (lastData.getZxId().compareTo(peerLastData.getZxId()) == 0) {
                         resData.setZxId(lastData.getZxId());
                     }
-
                     dataMsg.setNodeId(node.getNodeConfig().getNodeId());
                     dataMsg.setData(resData);
                     dataMsg.setSuccess(true);
                     return dataMsg.response(request);
-                }else if (dataMsg.getType() == DataMessage.Type.SNAPSHOT){
+                    // 消息进入提议状态, 只写入缓存，不持久化，只有收到commit后，才会持久化
+                } else if (dataMsg.getType() == DataMessage.Type.SNAPSHOT) {
                     Data snapshot = dataMsg.getData();
                     if (snapshot != null) {
                         boolean flag = node.getDataManager().put(snapshot.getKv().getObject1(), snapshot.getKv().getObject2());
@@ -74,11 +80,12 @@ public class DataRequestProcessor implements NettyRequestProcessor {
                         dataMsg.setSuccess(flag);
                         return dataMsg.response(request);
                     }
-                }else if (dataMsg.getType() == DataMessage.Type.COMMIT) {
+                    // 将缓存的消息持久化，并清除缓存
+                } else if (dataMsg.getType() == DataMessage.Type.COMMIT) {
                     Data data = dataMsg.getData();
                     if (data != null) {
                         long lastIndex = node.getDataManager().getLastIndex();
-                        if (lastIndex+1 == data.getZxId().getCounter()) {
+                        if (lastIndex + 1 == data.getZxId().getCounter()) {
                             boolean flag = node.getDataManager().write(data);
                             if (flag) {
                                 String value = node.getDataManager().get(data.getKv().getObject1());
@@ -91,7 +98,7 @@ public class DataRequestProcessor implements NettyRequestProcessor {
                 }
             }
             return null;
-        }finally {
+        } finally {
             node.getDataLock().unlock();
         }
     }

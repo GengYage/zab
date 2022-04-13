@@ -59,6 +59,7 @@ public class NodeConfig {
         if (current - preElectionTime < electionTimeout) {
             return false;
         }
+        //错开选举时间的关键，有一个200ms的随机时间
         preElectionTime = System.currentTimeMillis() + ThreadLocalRandom.current().nextInt(200) + 150;
         return true;
     }

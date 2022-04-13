@@ -19,10 +19,14 @@ public class ClientRequestProcessor implements NettyRequestProcessor {
         this.node = node;
     }
 
+    /**
+     * 处理客户端请求
+     */
     @Override
     public RemotingMessage processRequest(ChannelHandlerContext ctx, RemotingMessage request) throws Exception {
         KVMessage kvMessage = KVMessage.getInstance().parseMessage(request);
         KVMessage.KVType kvType = kvMessage.getKvType();
+        // 读请求，节点直接处理
         if (kvType == KVMessage.KVType.GET) {
             String value = node.getDataManager().get(kvMessage.getKey());
             if (value != null) {
@@ -36,17 +40,23 @@ public class ClientRequestProcessor implements NettyRequestProcessor {
             return kvMessage.response(request);
         }
 
+        // 写请求，转发给Leader
         if (node.getStatus() != NodeStatus.LEADING) {
             logger.info("Redirect to leader: " + node.getLeaderId());
             return node.redirect(request);
         }
 
+        // 自己为Leader 则直接处理写请求
         if (kvType == KVMessage.KVType.PUT) {
             boolean flag = node.getDataManager().put(kvMessage.getKey(), kvMessage.getValue());
             if (flag) {
+                // 现将写的消息设置未发起状态
                 node.getSnapshotMap().put(node.getNodeConfig().getNodeId(), true);
+                // 将消息广播至follower节点，使follower节点也将消息设置未发起状态
                 node.appendData(kvMessage.getKey(), kvMessage.getValue());
+                // 提交消息，是否能提交已在appendData阶段做了判断 countDownLatch
                 boolean committed = node.commitData(kvMessage.getKey());
+                // 设置写请求处理的结果
                 kvMessage.setSuccess(committed);
             }else {
                 kvMessage.setSuccess(false);

@@ -20,6 +20,9 @@ public class JoinGroupProcessor implements NettyRequestProcessor {
         this.node = node;
     }
 
+    /**
+     * 加入集群消息处理器
+     */
     @Override
     public RemotingMessage processRequest(ChannelHandlerContext ctx, RemotingMessage request) throws Exception {
         JoinGroupMessage req = JoinGroupMessage.getInstance().parseMessage(request);
@@ -29,6 +32,7 @@ public class JoinGroupProcessor implements NettyRequestProcessor {
             int peerPort = req.getPort();
             int peerNodeMgrPort = req.getNodeMgrPort();
 
+            // 将节点信息注册进缓存 NodeMap
             node.getNodeConfig().getNodeMap().putIfAbsent(peerId, peerHost+":"+peerPort);
             node.getNodeConfig().getNodeMgrMap().putIfAbsent(peerId, peerHost+":"+peerNodeMgrPort);
 
