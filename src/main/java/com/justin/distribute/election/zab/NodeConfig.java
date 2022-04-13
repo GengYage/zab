@@ -33,7 +33,6 @@ public class NodeConfig {
         for (Map.Entry<Integer, String> entry : map.entrySet()) {
             Integer id = entry.getKey();
             String[] addrs = entry.getValue().split(":");
-//            nodeMap.put(id, addrs[0]+":"+addrs[2]);
             nodeMgrMap.put(id, addrs[0]+":"+addrs[1]);
 
             if (nodeId == entry.getKey()) {

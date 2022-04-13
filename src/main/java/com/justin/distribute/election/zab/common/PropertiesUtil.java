@@ -16,7 +16,7 @@ public class PropertiesUtil {
     }
 
     public static Properties getProParms() {
-        return PropertiesUtil.getInstance().getProParms("/zab/zab.properties");
+        return PropertiesUtil.getInstance().getProParms("./zab.properties");
     }
 
     public static Map<Integer, String> getNodesAddress() {
