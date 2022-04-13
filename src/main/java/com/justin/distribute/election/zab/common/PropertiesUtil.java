@@ -1,7 +1,6 @@
 package com.justin.distribute.election.zab.common;
 
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -9,19 +8,20 @@ import java.util.Properties;
 
 public class PropertiesUtil {
 
-    private PropertiesUtil() {}
+    private PropertiesUtil() {
+    }
 
-    public static final PropertiesUtil getInstance() {
+    public static PropertiesUtil getInstance() {
         return new PropertiesUtil();
     }
 
-    public static Properties getProParms() {
-        return PropertiesUtil.getInstance().getProParms("./zab.properties");
+    public static Properties getProtParams() {
+        return PropertiesUtil.getInstance().getPortParams();
     }
 
     public static Map<Integer, String> getNodesAddress() {
         Map<Integer, String> nodesAddress = new HashMap<>();
-        for (int i=1; ; i++) {
+        for (int i = 1; ; i++) {
             String address = getClusterNodesAddress(i);
             if (address == null || address.equals("")) {
                 break;
@@ -32,11 +32,11 @@ public class PropertiesUtil {
     }
 
     public static String getClusterNodesAddress(final int id) {
-        return getProParms().getProperty("node."+id);
+        return getProtParams().getProperty("node." + id);
     }
 
     public static Integer getNodeId() {
-        return Integer.parseInt(getProParms().getProperty("node.id"));
+        return Integer.parseInt(getProtParams().getProperty("node.id"));
     }
 
     public static String getLogDir() {
@@ -48,23 +48,28 @@ public class PropertiesUtil {
     }
 
     public static String getDataDir() {
-        return getProParms().getProperty("node.data.dir");
+        return getProtParams().getProperty("node.data.dir");
     }
 
-    private Properties getProParms(String propertiesName) {
-        InputStream is = getClass().getResourceAsStream(propertiesName);
+    private Properties getPortParams() {
+        String configPath = System.getProperty("config");
+        File f = new File(configPath);
+        InputStream is;
+        try {
+            is = new FileInputStream(f);
+        } catch (FileNotFoundException e) {
+            throw new RuntimeException(e);
+        }
         Properties prop = new Properties();
         try {
             prop.load(is);
         } catch (IOException e1) {
             e1.printStackTrace();
-        }finally {
-            if(is != null) {
-                try {
-                    is.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
+        } finally {
+            try {
+                is.close();
+            } catch (IOException e) {
+                e.printStackTrace();
             }
         }
         return prop;
