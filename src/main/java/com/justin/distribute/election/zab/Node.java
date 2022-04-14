@@ -66,7 +66,6 @@ public class Node {
         if (running) {
             return;
         }
-
         synchronized (this) {
             if (running) {
                 return;
@@ -86,7 +85,7 @@ public class Node {
             client.start();
             // 初始化，宣告加入集群的消息，延迟2s后仅执行一次(2s时间用处确保本节点已经初始化)
             scheduledExecutorService.schedule(this::init, 2000, TimeUnit.MILLISECONDS);
-            // 选举线程，延迟秒开始选举，时钟500ms(完成一次选举后延迟500ms进行下一次Leader选举)
+            // 选举线程，延迟4s开始选举，时钟500ms(完成一次选举后延迟500ms进行下一次Leader选举)
             scheduledExecutorService.scheduleAtFixedRate(this::election, 4000, 500, TimeUnit.MILLISECONDS);
             // 一次心跳完成后，延迟5s进行下一次心跳
             scheduledExecutorService.scheduleWithFixedDelay(this::heartbeat, 0, nodeConfig.getHeartbeatTimeout(), TimeUnit.MILLISECONDS);
@@ -127,12 +126,12 @@ public class Node {
         joinGroupMsg.setPort(nodeConfig.getPort());
         joinGroupMsg.setNodeMgrPort(nodeConfig.getNodeMgrPort());
 
+        // 从配置文件中读取节点信息
         for (Map.Entry<Integer, String> entry : nodeConfig.getNodeMgrMap().entrySet()) {
             //跳过本节点，只给集群中其他节点发送消息
             if (entry.getKey() == nodeConfig.getNodeId()) {
                 continue;
             }
-
             executorService.submit(() -> {
                 try {
                     RemotingMessage response = client.invokeSync(entry.getValue(), joinGroupMsg.request(), 3*1000);
@@ -209,7 +208,6 @@ public class Node {
                 // 从日志中获取
                 index = dataManager.getLastIndex();
             }
-
             // 更新epoch
             Data data = dataManager.read(index);
             if (data.getZxId().getEpoch() == 0) {
@@ -332,7 +330,7 @@ public class Node {
     //提交数据
     public boolean commitData(final String key) throws InterruptedException {
         if (countDownLatch.await(6000, TimeUnit.MILLISECONDS)) {
-            // 清楚缓存，开始持久化
+            // 清除本地缓存，避免已被丢弃的消息再次出现
             snapshotMap.clear();
             long lastIndex = dataManager.getLastIndex();
             String value = dataManager.get(key);
