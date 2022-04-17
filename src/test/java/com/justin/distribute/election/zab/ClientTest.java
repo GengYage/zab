@@ -20,15 +20,15 @@ public class ClientTest {
 
     @Test
     public void testKVPut() {
-        String key = "election";
-        String value = "ZAB";
+        String key = "Geng";
+        String value = "Yage";
         boolean flag = client.put(key, value);
         System.out.println("Put-------====>flag: " + flag);
     }
 
     @Test
     public void testKVGet() {
-        String key = "election";
+        String key = "Geng";
         String value = client.get(key);
         System.out.println("Get-------====>value: " + value);
     }

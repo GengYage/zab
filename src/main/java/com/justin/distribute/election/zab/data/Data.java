@@ -7,7 +7,8 @@ public class Data {
     private ZxId zxId;
     private Pair<String, String> kv;
 
-    public Data() {}
+    public Data() {
+    }
 
     public Data(final ZxId zxId, final Pair<String, String> kv) {
         this.zxId = zxId;
@@ -18,7 +19,7 @@ public class Data {
     public String toString() {
         return "Data: {" +
                 " zxId=" + zxId +
-                " kv=[" + kv.getObject1() + ":" + kv.getObject2() +
+                " kv=[" + kv.getObject1() + ":" + kv.getObject2() + "]" +
                 "}";
     }
 
