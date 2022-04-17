@@ -3,3 +3,4 @@ LICENSE
 leader.log
 *.iml
 ./data
+./idea
