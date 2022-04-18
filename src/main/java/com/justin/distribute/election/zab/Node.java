@@ -134,7 +134,7 @@ public class Node {
             }
             executorService.submit(() -> {
                 try {
-                    RemotingMessage response = client.invokeSync(entry.getValue(), joinGroupMsg.request(), 3*1000);
+                    RemotingMessage response = client.invokeSync(entry.getValue(), joinGroupMsg.request(), 3 * 1000);
                     //解析消息，json的反序列化
                     JoinGroupMessage res = JoinGroupMessage.getInstance().parseMessage(response);
                     if (res.getSuccess()) {
@@ -143,8 +143,8 @@ public class Node {
                         int port = res.getPort();
                         int nodeMgrPort = res.getNodeMgrPort();
                         // 拿到其他节点的信息，通信端口和客户端端口
-                        nodeConfig.getNodeMap().putIfAbsent(peerNodeId, host+":"+port);
-                        nodeConfig.getNodeMgrMap().putIfAbsent(peerNodeId, host+":"+nodeMgrPort);
+                        nodeConfig.getNodeMap().putIfAbsent(peerNodeId, host + ":" + port);
+                        nodeConfig.getNodeMgrMap().putIfAbsent(peerNodeId, host + ":" + nodeMgrPort);
                     }
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -178,6 +178,7 @@ public class Node {
         // 投票消息
         VoteMessage voteMessage = VoteMessage.getInstance();
         voteMessage.setVote(myVote);
+
         sendOneWayMsg(voteMessage.request());
     }
 
@@ -204,7 +205,7 @@ public class Node {
             if (zxIdMap.containsKey(entry.getKey())) {
                 // 优先从缓存中存
                 index = zxIdMap.get(entry.getKey()).getCounter();
-            }else {
+            } else {
                 // 从日志中获取
                 index = dataManager.getLastIndex();
             }
@@ -221,7 +222,7 @@ public class Node {
             // 发送消息处理消息
             executorService.submit(() -> {
                 try {
-                    RemotingMessage response = client.invokeSync(entry.getValue(), dataMsg.request(), 3*1000);
+                    RemotingMessage response = client.invokeSync(entry.getValue(), dataMsg.request(), 3 * 1000);
                     DataMessage res = DataMessage.getInstance().parseMessage(response);
                     if (res.getSuccess()) {
                         int peerId = res.getNodeId();
@@ -243,7 +244,7 @@ public class Node {
             }
             executorService.submit(() -> {
                 try {
-                    client.invokeOneway(entry.getValue(), msg, 3*1000);
+                    client.invokeOneway(entry.getValue(), msg, 3 * 1000);
                 } catch (Exception e) {
                     logger.error(e);
                 }
@@ -276,7 +277,7 @@ public class Node {
     public RemotingMessage redirect(RemotingMessage request) {
         RemotingMessage response = null;
         try {
-            response = client.invokeSync(nodeConfig.getNodeMap().get(leaderId), request, 3*1000);
+            response = client.invokeSync(nodeConfig.getNodeMap().get(leaderId), request, 3 * 1000);
         } catch (Exception e) {
             logger.error(e);
         }
@@ -304,7 +305,7 @@ public class Node {
             // 导致服务器吞吐量降低
             executorService.submit(() -> {
                 try {
-                    RemotingMessage response = client.invokeSync(entry.getValue(), dataMessage.request(), 3*1000);
+                    RemotingMessage response = client.invokeSync(entry.getValue(), dataMessage.request(), 3 * 1000);
                     DataMessage resDataMsg = DataMessage.getInstance().parseMessage(response);
                     int peerId = resDataMsg.getNodeId();
                     boolean success = resDataMsg.getSuccess();
@@ -316,7 +317,7 @@ public class Node {
                             snapshotCounter += 1;
                         }
                     }
-                    if (snapshotCounter > nodeConfig.getNodeMap().size()/2) {
+                    if (snapshotCounter > nodeConfig.getNodeMap().size() / 2) {
                         // 通过countDownLatch 来标志是否可以提交数据
                         countDownLatch.countDown();
                     }
@@ -335,7 +336,7 @@ public class Node {
             long lastIndex = dataManager.getLastIndex();
             String value = dataManager.get(key);
             // 消息计数器自增
-            ZxId zxId = new ZxId(epoch, lastIndex+1);
+            ZxId zxId = new ZxId(epoch, lastIndex + 1);
             Pair<String, String> kv = new Pair<>(key, value);
             Data data = new Data(zxId, kv);
 
@@ -362,7 +363,7 @@ public class Node {
                 }
             }
             return flag;
-        }else {
+        } else {
             return false;
         }
     }
@@ -371,7 +372,7 @@ public class Node {
         long lastIndex = dataManager.getLastIndex();
         if (lastIndex == -1) {
             return new ZxId(0, 0);
-        }else {
+        } else {
             Data data = dataManager.read(lastIndex);
             return data.getZxId();
         }

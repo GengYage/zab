@@ -36,7 +36,7 @@ public class PropertiesUtil {
     }
 
     public static Integer getNodeId() {
-        return Integer.parseInt(getProtParams().getProperty("node.id"));
+        return Integer.parseInt(System.getProperty("nodeId"));
     }
 
     public static String getLogDir() {

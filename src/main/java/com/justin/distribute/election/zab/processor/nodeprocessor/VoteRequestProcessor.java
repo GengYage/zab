@@ -38,6 +38,7 @@ public class VoteRequestProcessor implements NettyRequestProcessor {
                     node.getMyVote().setEpoch(peerVote.getEpoch());
                     node.getMyVote().setVoteId(peerVote.getNodeId());
                     node.setStatus(NodeStatus.LOOKING);
+                    logger.info("节点更改投票: {}", peerVote);
                 } else if (peerVote.getEpoch() == node.getMyVote().getEpoch()) {
                     // 比较投票有效性，若投票者比自己更适合成为Leader则更新自己的投票消息
                     if (peerVote.compareTo(node.getMyVote()) > 0) {
